@@ -144,8 +144,6 @@
             return { hashPassword, verifyPassword, encryptData, decryptData };
         })();
 
-        if(localStorage.getItem('vibipass_profile')) window.location.href = 'auth.html';
-
         let signupCaptchaText = '';
         const CAPTCHA_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -174,8 +172,6 @@
                 svgContent+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(180,180,180,0.18)" stroke-width="1.5"/>`;
             }
             svgContent+=`</svg>`;
-
-            // Use data URL image instead of innerHTML for WebKit compatibility
             const encoded = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgContent);
             const img = document.createElement('img');
             img.src = encoded;
@@ -234,7 +230,19 @@
             }
         }
 
-        window.addEventListener('DOMContentLoaded', generateSignupCaptcha);
+        function waitForStorage() {
+            try {
+                if(localStorage.getItem('vibipass_profile')) {
+                    window.location.href = 'auth.html';
+                    return;
+                }
+                generateSignupCaptcha();
+            } catch(e) {
+                setTimeout(waitForStorage, 100);
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', waitForStorage);
     </script>
 </body>
 </html>
