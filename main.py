@@ -1,6 +1,6 @@
 """
 VibiPass - PyWebView Desktop App
-Bridges browser localStorage to an encrypted JSON file on disk.
+Serves files via a local HTTP server so paths work correctly on ALL platforms.
 """
 
 import webview
@@ -8,13 +8,19 @@ import json
 import os
 import sys
 import threading
+import http.server
+import socketserver
+import socket
 
-# ── Path helpers ──────────────────────────────────────────────────────────────
+
+def get_base_dir() -> str:
+    if getattr(sys, "frozen", False):
+        return sys._MEIPASS
+    return os.path.dirname(os.path.abspath(__file__))
+
 
 def get_app_dir() -> str:
-    """Return a writable directory for user data next to the app."""
     if getattr(sys, "frozen", False):
-        # PyInstaller bundle
         base = os.path.dirname(sys.executable)
     else:
         base = os.path.dirname(os.path.abspath(__file__))
@@ -27,28 +33,29 @@ def get_storage_path() -> str:
     return os.path.join(get_app_dir(), "store.json")
 
 
-def get_html_path(page: str) -> str:
-    """Return file:// URL for an HTML page."""
-    if getattr(sys, "frozen", False):
-        base = sys._MEIPASS          # type: ignore[attr-defined]
-    else:
-        base = os.path.dirname(os.path.abspath(__file__))
-    path = os.path.join(base, "html", page)
-    # webview accepts plain paths; it prepends file:// internally on all OSes
-    return path
+def find_free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('127.0.0.1', 0))
+        return s.getsockname()[1]
 
 
-# ── Persistent storage (plain JSON – crypto stays in JS/WebCrypto) ────────────
+class SilentHandler(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, format, *args): pass
+    def log_error(self, format, *args): pass
+
+
+def start_server(base_dir: str, port: int):
+    os.chdir(base_dir)
+    httpd = socketserver.TCPServer(('127.0.0.1', port), SilentHandler)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    return httpd
+
 
 class StorageBridge:
-    """Exposed to JS as `window.pywebview.api`."""
-
     def __init__(self):
         self._lock = threading.Lock()
         self._path = get_storage_path()
         self._data = self._load()
-
-    # ── internal ──────────────────────────────────────────────────────────────
 
     def _load(self) -> dict:
         try:
@@ -61,11 +68,9 @@ class StorageBridge:
         with open(self._path, "w", encoding="utf-8") as f:
             json.dump(self._data, f, ensure_ascii=False, indent=2)
 
-    # ── public API (called from JS) ───────────────────────────────────────────
-
     def getItem(self, key: str):
         with self._lock:
-            return self._data.get(key)          # None → JS null
+            return self._data.get(key)
 
     def setItem(self, key: str, value: str):
         with self._lock:
@@ -90,8 +95,6 @@ class StorageBridge:
             return list(self._data.keys())
 
 
-# ── localStorage shim injected into every page ────────────────────────────────
-
 LOCALSTORAGE_SHIM = """
 (function () {
   if (window.__vibiStorageReady) return;
@@ -101,9 +104,6 @@ LOCALSTORAGE_SHIM = """
   if (!api) { console.warn('VibiPass: pywebview API not available'); return; }
 
   const _cache = {};
-
-  // Seed cache from disk synchronously before page scripts run
-  // pywebview JS API calls are synchronous from the browser side
   try {
     const keys = api.getAllKeys();
     if (Array.isArray(keys)) {
@@ -127,12 +127,8 @@ LOCALSTORAGE_SHIM = """
       Object.keys(_cache).forEach(k => delete _cache[k]);
       api.clear();
     },
-    key(index) {
-      return Object.keys(_cache)[index] || null;
-    },
-    get length() {
-      return Object.keys(_cache).length;
-    }
+    key(index) { return Object.keys(_cache)[index] || null; },
+    get length() { return Object.keys(_cache).length; }
   };
 
   try {
@@ -146,14 +142,10 @@ LOCALSTORAGE_SHIM = """
 })();
 """
 
-
-# ── Window & navigation logic ─────────────────────────────────────────────────
-
 _window = None
 
 
 def on_loaded():
-    """Inject the localStorage shim after every page navigation."""
     global _window
     if _window:
         _window.evaluate_js(LOCALSTORAGE_SHIM)
@@ -163,13 +155,17 @@ def main():
     global _window
 
     bridge = StorageBridge()
+    base_dir = get_base_dir()
 
-    # Decide start page: if profile exists on disk go straight to auth
+    port = find_free_port()
+    start_server(base_dir, port)
+
     start_page = "auth.html" if bridge.getItem("vibipass_profile") else "landing.html"
+    url = f"http://127.0.0.1:{port}/html/{start_page}"
 
     _window = webview.create_window(
         title="VibiPass",
-        url=get_html_path(start_page),
+        url=url,
         js_api=bridge,
         width=1024,
         height=700,
@@ -179,8 +175,6 @@ def main():
     )
 
     _window.events.loaded += on_loaded
-
-    # Start webview (blocking)
     webview.start(debug=False)
 
 
