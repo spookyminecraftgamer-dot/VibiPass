@@ -158,7 +158,7 @@ def main():
         confirm_close=False,
     )
     _window.events.loaded += on_loaded
-    webview.start(debug=False)
+    webview.start(debug=False, http_server=True)
 
 if __name__ == "__main__":
     main()
