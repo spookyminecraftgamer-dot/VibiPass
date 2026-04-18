@@ -32,8 +32,8 @@ jobs:
           printf '#!/bin/bash\nexec /usr/local/lib/vibipass/VibiPass "$@"\n' > dist/${PKG}/usr/local/bin/vibipass
           chmod +x dist/${PKG}/usr/local/bin/vibipass
           printf '[Desktop Entry]\nVersion=1.0\nType=Application\nName=VibiPass\nExec=/usr/local/bin/vibipass\nIcon=vibipass\nTerminal=false\nCategories=Utility;Security;\n' > dist/${PKG}/usr/share/applications/vibipass.desktop
-          cp assets/theme/Red/credentials.png dist/${PKG}/usr/share/pixmaps/vibipass.png 2>/dev/null || true
-          printf "Package: vibipass\nVersion: ${VERSION}\nSection: utils\nPriority: optional\nArchitecture: ${ARCH}\nDepends: python3, gir1.2-webkit2-4.0, libgtk-3-0\nMaintainer: VibiPass\nDescription: VibiPass Secure Password Manager\n" > dist/${PKG}/DEBIAN/control
+          cp assets/vibipass.png dist/${PKG}/usr/share/pixmaps/vibipass.png 2>/dev/null || true
+          printf "Package: vibipass\nVersion: ${VERSION}\nSection: utils\nPriority: optional\nArchitecture: ${ARCH}\nDepends: python3, libgtk-3-0\nMaintainer: VibiPass\nDescription: VibiPass Secure Password Manager\n" > dist/${PKG}/DEBIAN/control
           fakeroot dpkg-deb --build dist/${PKG} dist/vibipass_1.0_amd64.deb
       - uses: actions/upload-artifact@v4
         with:
@@ -108,7 +108,7 @@ jobs:
             ## VibiPass — Secure Password Manager
             | Platform | File |
             |----------|------|
-            | 🐧 Linux .deb | vibipass_1.0_amd64.deb |
+            | 🐧 Linux .deb (Ubuntu/Mint/Debian) | vibipass_1.0_amd64.deb |
             | 🐧 Linux portable | VibiPass_linux_portable.tar.gz |
             | 🪟 Windows installer | VibiPass_Setup_1.0.exe |
             | 🪟 Windows portable | VibiPass_windows_portable.zip |
