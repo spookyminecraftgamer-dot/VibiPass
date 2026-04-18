@@ -47,7 +47,7 @@
             border-radius: 10px; padding: 14px; margin-top: 14px; text-align: center;
         }
         .captcha-wrap p { font-size: 0.72rem; color: rgba(255,255,255,0.4); letter-spacing: 1px; margin-bottom: 10px; text-transform: uppercase; }
-        #signup-captcha-canvas { border-radius: 6px; user-select: none; display: block; margin: 0 auto; }
+        #signup-captcha-svg { border-radius: 6px; overflow: hidden; margin: 0 auto; }
         .captcha-actions { display: flex; gap: 10px; margin-top: 10px; }
         .captcha-actions input { flex: 1; margin: 0; }
         .refresh-btn {
@@ -75,41 +75,32 @@
             <h1>VibiPass</h1>
             <p>Create your one-time profile</p>
         </div>
-
         <label>Your Name</label>
         <input type="text" id="su-name" placeholder="e.g. Chatresh">
-
         <label>User ID</label>
         <input type="text" id="su-userid" placeholder="Choose a unique user ID">
-
         <label>Master App Password</label>
         <input type="password" id="su-pass" placeholder="Create a strong password" oninput="checkStrength(this.value)">
         <div class="strength-bar-wrap"><div class="strength-bar" id="strength-bar"></div></div>
         <div class="strength-label" id="strength-label">—</div>
-
         <label>Confirm Master Password</label>
         <input type="password" id="su-pass-confirm" placeholder="Re-enter your password">
         <div class="err" id="err-pass">Passwords do not match.</div>
-
         <hr class="divider">
-
         <label>Device Password</label>
         <input type="password" id="su-dev-pass" placeholder="Your device / Windows password">
         <input type="password" id="su-dev-pass-confirm" placeholder="Confirm device password" style="margin-top:10px;">
         <div class="err" id="err-dev">Device passwords do not match.</div>
-
         <hr class="divider">
-
         <div class="captcha-wrap">
             <p>Verify you're human — type the characters</p>
-            <canvas id="signup-captcha-canvas" width="280" height="75"></canvas>
+            <div id="signup-captcha-svg" style="border-radius:6px;overflow:hidden;margin:0 auto;width:280px;height:75px;"></div>
             <div class="captcha-actions">
                 <input type="text" id="signup-captcha-input" placeholder="Enter characters above" autocomplete="off">
-                <button class="refresh-btn" onclick="generateSignupCaptcha()">?</button>
+                <button class="refresh-btn" onclick="generateSignupCaptcha()">↺</button>
             </div>
         </div>
         <div class="err" id="err-captcha">Incorrect captcha. Please try again.</div>
-
         <button class="create-btn" id="create-btn" onclick="createProfile()">Create Profile ?</button>
         <div class="loading-msg" id="loading-msg">?? Securing your profile... please wait</div>
         <p class="info-note">Only one profile can exist at a time.<br>Your data stays local — never uploaded anywhere.</p>
@@ -162,21 +153,32 @@
         function generateSignupCaptcha() {
             signupCaptchaText = Array.from({length:6},()=>CAPTCHA_CHARS[Math.floor(Math.random()*CAPTCHA_CHARS.length)]).join('');
             document.getElementById('signup-captcha-input').value = '';
-            const canvas=document.getElementById('signup-captcha-canvas');
-            const ctx=canvas.getContext('2d'); const w=canvas.width,h=canvas.height;
-            ctx.clearRect(0,0,w,h);
-            for(let i=0;i<500;i++){ctx.fillStyle=`rgba(${Math.random()*255|0},${Math.random()*255|0},${Math.random()*255|0},0.1)`;ctx.fillRect(Math.random()*w,Math.random()*h,2,2);}
-            for(let i=0;i<6;i++){ctx.beginPath();ctx.strokeStyle='rgba(100,200,100,0.13)';ctx.moveTo(0,Math.random()*h);ctx.bezierCurveTo(w/3,Math.random()*h,2*w/3,Math.random()*h,w,Math.random()*h);ctx.stroke();}
             const colors=['#1DB954','#ffffff','#a0ffcc','#00e676','#69f0ae'];
+            const bg = `rgba(10,20,10,0.9)`;
+            let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="280" height="75" style="background:${bg};">`;
+            // noise dots
+            for(let i=0;i<80;i++){
+                const x=Math.random()*280, y=Math.random()*75;
+                const c=colors[Math.floor(Math.random()*colors.length)];
+                svgContent+=`<circle cx="${x}" cy="${y}" r="1" fill="${c}" opacity="0.3"/>`;
+            }
+            // noise lines
+            for(let i=0;i<4;i++){
+                const x1=Math.random()*280,y1=Math.random()*75,x2=Math.random()*280,y2=Math.random()*75;
+                svgContent+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(100,200,100,0.15)" stroke-width="1.5"/>`;
+            }
+            // characters
             signupCaptchaText.split('').forEach((ch,i)=>{
-                ctx.save();ctx.translate(26+i*40,h/2+10);ctx.rotate((Math.random()-0.5)*0.6);
-                ctx.font=`bold ${28+Math.random()*8|0}px 'Courier New',monospace`;
-                ctx.fillStyle=colors[Math.floor(Math.random()*colors.length)];
-                ctx.shadowColor='rgba(0,0,0,0.9)';ctx.shadowBlur=5;
-                ctx.transform(1,(Math.random()-0.5)*0.3,(Math.random()-0.5)*0.25,1,0,0);
-                ctx.fillText(ch,0,0);ctx.restore();
+                const x = 26+i*40;
+                const y = 38 + (Math.random()-0.5)*10;
+                const rot = (Math.random()-0.5)*25;
+                const size = 24+Math.floor(Math.random()*8);
+                const color = colors[Math.floor(Math.random()*colors.length)];
+                const skewX = (Math.random()-0.5)*15;
+                svgContent+=`<text x="${x}" y="${y}" font-family="monospace" font-size="${size}" font-weight="bold" fill="${color}" transform="rotate(${rot},${x},${y}) skewX(${skewX})" style="user-select:none">${ch}</text>`;
             });
-            for(let i=0;i<5;i++){ctx.beginPath();ctx.strokeStyle='rgba(180,180,180,0.18)';ctx.lineWidth=1.5;ctx.moveTo(Math.random()*w,Math.random()*h);ctx.lineTo(Math.random()*w,Math.random()*h);ctx.stroke();}
+            svgContent+=`</svg>`;
+            document.getElementById('signup-captcha-svg').innerHTML = svgContent;
         }
 
         function checkStrength(val) {
@@ -190,30 +192,25 @@
         }
 
         async function createProfile() {
-            const name      = document.getElementById('su-name').value.trim();
-            const userid    = document.getElementById('su-userid').value.trim();
-            const pass      = document.getElementById('su-pass').value;
-            const passConf  = document.getElementById('su-pass-confirm').value;
-            const devPass   = document.getElementById('su-dev-pass').value;
-            const devConf   = document.getElementById('su-dev-pass-confirm').value;
+            const name = document.getElementById('su-name').value.trim();
+            const userid = document.getElementById('su-userid').value.trim();
+            const pass = document.getElementById('su-pass').value;
+            const passConf = document.getElementById('su-pass-confirm').value;
+            const devPass = document.getElementById('su-dev-pass').value;
+            const devConf = document.getElementById('su-dev-pass-confirm').value;
             const captchaIn = document.getElementById('signup-captcha-input').value.toUpperCase().replace(/\s/g,'');
-
             ['err-pass','err-dev','err-captcha'].forEach(id=>document.getElementById(id).style.display='none');
-
             if(!name||!userid||!pass||!devPass){alert('Please fill in all fields.');return;}
             if(pass!==passConf){document.getElementById('err-pass').style.display='block';return;}
             if(devPass!==devConf){document.getElementById('err-dev').style.display='block';return;}
             if(captchaIn!==signupCaptchaText){document.getElementById('err-captcha').style.display='block';generateSignupCaptcha();return;}
-
             // Disable button, show loading (PBKDF2 takes a moment)
             document.getElementById('create-btn').disabled = true;
             document.getElementById('loading-msg').style.display = 'block';
-
             try {
                 // Hash both passwords with PBKDF2 — never stored as plain text
                 const appPassHash = await VCrypto.hashPassword(pass);
                 const devPassHash = await VCrypto.hashPassword(devPass);
-
                 const profile = { name, userid };
                 localStorage.setItem('vibipass_profile', JSON.stringify(profile));
                 // Store HASHES not plain passwords
@@ -222,12 +219,10 @@
                 // Store plain pass temporarily in sessionStorage ONLY for vault encryption key
                 // It is never persisted to localStorage
                 sessionStorage.setItem('vp_session_key', pass);
-
                 if(!localStorage.getItem('sentinel_img')) {
                     localStorage.setItem('sentinel_img', 'green');
                     localStorage.setItem('sentinel_color', '#1DB954');
                 }
-
                 window.location.href = 'auth.html';
             } catch(e) {
                 alert('Error creating profile. Please try again.');
@@ -236,9 +231,7 @@
             }
         }
 
-        window.addEventListener('DOMContentLoaded', () => {
-    setTimeout(generateSignupCaptcha, 300);
-});
+        window.addEventListener('DOMContentLoaded', generateSignupCaptcha);
     </script>
 </body>
 </html>
