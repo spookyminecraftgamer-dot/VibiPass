@@ -47,7 +47,7 @@
             border-radius: 10px; padding: 14px; margin-top: 14px; text-align: center;
         }
         .captcha-wrap p { font-size: 0.72rem; color: rgba(255,255,255,0.4); letter-spacing: 1px; margin-bottom: 10px; text-transform: uppercase; }
-        #signup-captcha-svg { border-radius: 6px; overflow: hidden; margin: 0 auto; }
+        #signup-captcha-svg { border-radius: 6px; overflow: hidden; margin: 0 auto; width: 280px; height: 75px; }
         .captcha-actions { display: flex; gap: 10px; margin-top: 10px; }
         .captcha-actions input { flex: 1; margin: 0; }
         .refresh-btn {
@@ -102,12 +102,11 @@
         </div>
         <div class="err" id="err-captcha">Incorrect captcha. Please try again.</div>
         <button class="create-btn" id="create-btn" onclick="createProfile()">Create Profile ?</button>
-        <div class="loading-msg" id="loading-msg">?? Securing your profile... please wait</div>
+        <div class="loading-msg" id="loading-msg">⏳ Securing your profile... please wait</div>
         <p class="info-note">Only one profile can exist at a time.<br>Your data stays local — never uploaded anywhere.</p>
     </div>
 
     <script>
-        // ---- CRYPTO UTILS ----
         const VCrypto = (() => {
             const PBKDF2_ITERATIONS = 100000;
             const SALT_LEN = 16; const IV_LEN = 12;
@@ -153,32 +152,41 @@
         function generateSignupCaptcha() {
             signupCaptchaText = Array.from({length:6},()=>CAPTCHA_CHARS[Math.floor(Math.random()*CAPTCHA_CHARS.length)]).join('');
             document.getElementById('signup-captcha-input').value = '';
-            const colors=['#1DB954','#ffffff','#a0ffcc','#00e676','#69f0ae'];
-            const bg = `rgba(10,20,10,0.9)`;
-            let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="280" height="75" style="background:${bg};">`;
-            // noise dots
+            const colors = ['#1DB954','#ffffff','#a0ffcc','#00e676','#69f0ae'];
+            let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="280" height="75" style="background:rgba(10,20,10,0.9);">`;
             for(let i=0;i<80;i++){
                 const x=Math.random()*280, y=Math.random()*75;
-                const c=colors[Math.floor(Math.random()*colors.length)];
-                svgContent+=`<circle cx="${x}" cy="${y}" r="1" fill="${c}" opacity="0.3"/>`;
+                svgContent+=`<circle cx="${x}" cy="${y}" r="1" fill="${colors[Math.floor(Math.random()*colors.length)]}" opacity="0.3"/>`;
             }
-            // noise lines
             for(let i=0;i<4;i++){
                 const x1=Math.random()*280,y1=Math.random()*75,x2=Math.random()*280,y2=Math.random()*75;
                 svgContent+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(100,200,100,0.15)" stroke-width="1.5"/>`;
             }
-            // characters
             signupCaptchaText.split('').forEach((ch,i)=>{
-                const x = 26+i*40;
-                const y = 38 + (Math.random()-0.5)*10;
-                const rot = (Math.random()-0.5)*25;
-                const size = 24+Math.floor(Math.random()*8);
-                const color = colors[Math.floor(Math.random()*colors.length)];
-                const skewX = (Math.random()-0.5)*15;
+                const x=26+i*40, y=38+(Math.random()-0.5)*10;
+                const rot=(Math.random()-0.5)*25, size=24+Math.floor(Math.random()*8);
+                const color=colors[Math.floor(Math.random()*colors.length)];
+                const skewX=(Math.random()-0.5)*15;
                 svgContent+=`<text x="${x}" y="${y}" font-family="monospace" font-size="${size}" font-weight="bold" fill="${color}" transform="rotate(${rot},${x},${y}) skewX(${skewX})" style="user-select:none">${ch}</text>`;
             });
+            for(let i=0;i<5;i++){
+                const x1=Math.random()*280,y1=Math.random()*75,x2=Math.random()*280,y2=Math.random()*75;
+                svgContent+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(180,180,180,0.18)" stroke-width="1.5"/>`;
+            }
             svgContent+=`</svg>`;
-            document.getElementById('signup-captcha-svg').innerHTML = svgContent;
+
+            // Use data URL image instead of innerHTML for WebKit compatibility
+            const encoded = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgContent);
+            const img = document.createElement('img');
+            img.src = encoded;
+            img.width = 280;
+            img.height = 75;
+            img.style.borderRadius = '6px';
+            img.style.display = 'block';
+            img.style.margin = '0 auto';
+            const container = document.getElementById('signup-captcha-svg');
+            container.innerHTML = '';
+            container.appendChild(img);
         }
 
         function checkStrength(val) {
@@ -192,32 +200,27 @@
         }
 
         async function createProfile() {
-            const name = document.getElementById('su-name').value.trim();
-            const userid = document.getElementById('su-userid').value.trim();
-            const pass = document.getElementById('su-pass').value;
-            const passConf = document.getElementById('su-pass-confirm').value;
-            const devPass = document.getElementById('su-dev-pass').value;
-            const devConf = document.getElementById('su-dev-pass-confirm').value;
+            const name      = document.getElementById('su-name').value.trim();
+            const userid    = document.getElementById('su-userid').value.trim();
+            const pass      = document.getElementById('su-pass').value;
+            const passConf  = document.getElementById('su-pass-confirm').value;
+            const devPass   = document.getElementById('su-dev-pass').value;
+            const devConf   = document.getElementById('su-dev-pass-confirm').value;
             const captchaIn = document.getElementById('signup-captcha-input').value.toUpperCase().replace(/\s/g,'');
             ['err-pass','err-dev','err-captcha'].forEach(id=>document.getElementById(id).style.display='none');
             if(!name||!userid||!pass||!devPass){alert('Please fill in all fields.');return;}
             if(pass!==passConf){document.getElementById('err-pass').style.display='block';return;}
             if(devPass!==devConf){document.getElementById('err-dev').style.display='block';return;}
             if(captchaIn!==signupCaptchaText){document.getElementById('err-captcha').style.display='block';generateSignupCaptcha();return;}
-            // Disable button, show loading (PBKDF2 takes a moment)
             document.getElementById('create-btn').disabled = true;
             document.getElementById('loading-msg').style.display = 'block';
             try {
-                // Hash both passwords with PBKDF2 — never stored as plain text
                 const appPassHash = await VCrypto.hashPassword(pass);
                 const devPassHash = await VCrypto.hashPassword(devPass);
                 const profile = { name, userid };
                 localStorage.setItem('vibipass_profile', JSON.stringify(profile));
-                // Store HASHES not plain passwords
                 localStorage.setItem('sentinel_app_pass', appPassHash);
                 localStorage.setItem('sentinel_dev_pass', devPassHash);
-                // Store plain pass temporarily in sessionStorage ONLY for vault encryption key
-                // It is never persisted to localStorage
                 sessionStorage.setItem('vp_session_key', pass);
                 if(!localStorage.getItem('sentinel_img')) {
                     localStorage.setItem('sentinel_img', 'green');
