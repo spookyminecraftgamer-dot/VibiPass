@@ -85,7 +85,7 @@
         <label>Master App Password</label>
         <input type="password" id="su-pass" placeholder="Create a strong password" oninput="checkStrength(this.value)">
         <div class="strength-bar-wrap"><div class="strength-bar" id="strength-bar"></div></div>
-        <div class="strength-label" id="strength-label">—</div>
+        <div class="strength-label" id="strength-label">â€”</div>
 
         <label>Confirm Master Password</label>
         <input type="password" id="su-pass-confirm" placeholder="Re-enter your password">
@@ -101,7 +101,7 @@
         <hr class="divider">
 
         <div class="captcha-wrap">
-            <p>Verify you're human — type the characters</p>
+            <p>Verify you're human â€” type the characters</p>
             <canvas id="signup-captcha-canvas" width="280" height="75"></canvas>
             <div class="captcha-actions">
                 <input type="text" id="signup-captcha-input" placeholder="Enter characters above" autocomplete="off">
@@ -112,7 +112,7 @@
 
         <button class="create-btn" id="create-btn" onclick="createProfile()">Create Profile ?</button>
         <div class="loading-msg" id="loading-msg">?? Securing your profile... please wait</div>
-        <p class="info-note">Only one profile can exist at a time.<br>Your data stays local — never uploaded anywhere.</p>
+        <p class="info-note">Only one profile can exist at a time.<br>Your data stays local â€” never uploaded anywhere.</p>
     </div>
 
     <script>
@@ -184,7 +184,7 @@
             let s=0;
             if(val.length>=8)s++; if(val.length>=12)s++;
             if(/[A-Z]/.test(val))s++; if(/[0-9]/.test(val))s++; if(/[^A-Za-z0-9]/.test(val))s++;
-            const levels=[{w:'0%',c:'transparent',t:'—'},{w:'20%',c:'#ff4444',t:'Very Weak'},{w:'40%',c:'#ff8c00',t:'Weak'},{w:'60%',c:'#ffd600',t:'Fair'},{w:'80%',c:'#1DB954',t:'Strong'},{w:'100%',c:'#00e676',t:'Very Strong'}];
+            const levels=[{w:'0%',c:'transparent',t:'â€”'},{w:'20%',c:'#ff4444',t:'Very Weak'},{w:'40%',c:'#ff8c00',t:'Weak'},{w:'60%',c:'#ffd600',t:'Fair'},{w:'80%',c:'#1DB954',t:'Strong'},{w:'100%',c:'#00e676',t:'Very Strong'}];
             bar.style.width=levels[s].w; bar.style.background=levels[s].c;
             lbl.innerText=levels[s].t; lbl.style.color=levels[s].c;
         }
@@ -210,7 +210,7 @@
             document.getElementById('loading-msg').style.display = 'block';
 
             try {
-                // Hash both passwords with PBKDF2 — never stored as plain text
+                // Hash both passwords with PBKDF2 â€” never stored as plain text
                 const appPassHash = await VCrypto.hashPassword(pass);
                 const devPassHash = await VCrypto.hashPassword(devPass);
 
@@ -236,7 +236,9 @@
             }
         }
 
-        window.onload = generateSignupCaptcha;
+        window.addEventListener('DOMContentLoaded', () => {
+    setTimeout(generateSignupCaptcha, 300);
+});
     </script>
 </body>
 </html>
