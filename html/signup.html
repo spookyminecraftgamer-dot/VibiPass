@@ -242,7 +242,7 @@
             }
         }
 
-        window.addEventListener('DOMContentLoaded', waitForStorage);
+        window.addEventListener('DOMContentLoaded', () => setTimeout(waitForStorage, 500));
     </script>
 </body>
 </html>
