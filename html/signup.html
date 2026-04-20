@@ -82,7 +82,7 @@
         <label>Master App Password</label>
         <input type="password" id="su-pass" placeholder="Create a strong password" oninput="checkStrength(this.value)">
         <div class="strength-bar-wrap"><div class="strength-bar" id="strength-bar"></div></div>
-        <div class="strength-label" id="strength-label">—</div>
+        <div class="strength-label" id="strength-label"></div>
         <label>Confirm Master Password</label>
         <input type="password" id="su-pass-confirm" placeholder="Re-enter your password">
         <div class="err" id="err-pass">Passwords do not match.</div>
@@ -101,11 +101,10 @@
             </div>
         </div>
         <div class="err" id="err-captcha">Incorrect captcha. Please try again.</div>
-        <button class="create-btn" id="create-btn" onclick="createProfile()">Create Profile ?</button>
+        <button class="create-btn" id="create-btn" onclick="createProfile()">Create Profile →</button>
         <div class="loading-msg" id="loading-msg">⏳ Securing your profile... please wait</div>
         <p class="info-note">Only one profile can exist at a time.<br>Your data stays local — never uploaded anywhere.</p>
     </div>
-
     <script>
         const VCrypto = (() => {
             const PBKDF2_ITERATIONS = 100000;
@@ -144,6 +143,8 @@
             return { hashPassword, verifyPassword, encryptData, decryptData };
         })();
 
+        if(localStorage.getItem('vibipass_profile')) window.location.href = 'auth.html';
+
         let signupCaptchaText = '';
         const CAPTCHA_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -151,98 +152,64 @@
             signupCaptchaText = Array.from({length:6},()=>CAPTCHA_CHARS[Math.floor(Math.random()*CAPTCHA_CHARS.length)]).join('');
             document.getElementById('signup-captcha-input').value = '';
             const colors = ['#1DB954','#ffffff','#a0ffcc','#00e676','#69f0ae'];
-            let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="280" height="75" style="background:rgba(10,20,10,0.9);">`;
-            for(let i=0;i<80;i++){
-                const x=Math.random()*280, y=Math.random()*75;
-                svgContent+=`<circle cx="${x}" cy="${y}" r="1" fill="${colors[Math.floor(Math.random()*colors.length)]}" opacity="0.3"/>`;
-            }
-            for(let i=0;i<4;i++){
-                const x1=Math.random()*280,y1=Math.random()*75,x2=Math.random()*280,y2=Math.random()*75;
-                svgContent+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(100,200,100,0.15)" stroke-width="1.5"/>`;
-            }
+            let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="280" height="75" style="background:rgba(10,20,10,0.9);">`;
+            for(let i=0;i<80;i++){const x=Math.random()*280,y=Math.random()*75;svg+=`<circle cx="${x}" cy="${y}" r="1" fill="${colors[Math.floor(Math.random()*colors.length)]}" opacity="0.3"/>`;}
+            for(let i=0;i<4;i++){const x1=Math.random()*280,y1=Math.random()*75,x2=Math.random()*280,y2=Math.random()*75;svg+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(100,200,100,0.15)" stroke-width="1.5"/>`;}
             signupCaptchaText.split('').forEach((ch,i)=>{
-                const x=26+i*40, y=38+(Math.random()-0.5)*10;
-                const rot=(Math.random()-0.5)*25, size=24+Math.floor(Math.random()*8);
-                const color=colors[Math.floor(Math.random()*colors.length)];
-                const skewX=(Math.random()-0.5)*15;
-                svgContent+=`<text x="${x}" y="${y}" font-family="monospace" font-size="${size}" font-weight="bold" fill="${color}" transform="rotate(${rot},${x},${y}) skewX(${skewX})" style="user-select:none">${ch}</text>`;
+                const x=26+i*40,y=38+(Math.random()-0.5)*10,rot=(Math.random()-0.5)*25,size=24+Math.floor(Math.random()*8);
+                const color=colors[Math.floor(Math.random()*colors.length)],skewX=(Math.random()-0.5)*15;
+                svg+=`<text x="${x}" y="${y}" font-family="monospace" font-size="${size}" font-weight="bold" fill="${color}" transform="rotate(${rot},${x},${y}) skewX(${skewX})" style="user-select:none">${ch}</text>`;
             });
-            for(let i=0;i<5;i++){
-                const x1=Math.random()*280,y1=Math.random()*75,x2=Math.random()*280,y2=Math.random()*75;
-                svgContent+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(180,180,180,0.18)" stroke-width="1.5"/>`;
-            }
-            svgContent+=`</svg>`;
-            const encoded = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgContent);
-            const img = document.createElement('img');
-            img.src = encoded;
-            img.width = 280;
-            img.height = 75;
-            img.style.borderRadius = '6px';
-            img.style.display = 'block';
-            img.style.margin = '0 auto';
-            const container = document.getElementById('signup-captcha-svg');
-            container.innerHTML = '';
-            container.appendChild(img);
+            for(let i=0;i<5;i++){const x1=Math.random()*280,y1=Math.random()*75,x2=Math.random()*280,y2=Math.random()*75;svg+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(180,180,180,0.18)" stroke-width="1.5"/>`;}
+            svg+=`</svg>`;
+            const img=document.createElement('img');
+            img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+            img.width=280;img.height=75;img.style.borderRadius='6px';img.style.display='block';img.style.margin='0 auto';
+            const c=document.getElementById('signup-captcha-svg');c.innerHTML='';c.appendChild(img);
         }
 
         function checkStrength(val) {
             const bar=document.getElementById('strength-bar'),lbl=document.getElementById('strength-label');
             let s=0;
-            if(val.length>=8)s++; if(val.length>=12)s++;
-            if(/[A-Z]/.test(val))s++; if(/[0-9]/.test(val))s++; if(/[^A-Za-z0-9]/.test(val))s++;
-            const levels=[{w:'0%',c:'transparent',t:'—'},{w:'20%',c:'#ff4444',t:'Very Weak'},{w:'40%',c:'#ff8c00',t:'Weak'},{w:'60%',c:'#ffd600',t:'Fair'},{w:'80%',c:'#1DB954',t:'Strong'},{w:'100%',c:'#00e676',t:'Very Strong'}];
-            bar.style.width=levels[s].w; bar.style.background=levels[s].c;
-            lbl.innerText=levels[s].t; lbl.style.color=levels[s].c;
+            if(val.length>=8)s++;if(val.length>=12)s++;
+            if(/[A-Z]/.test(val))s++;if(/[0-9]/.test(val))s++;if(/[^A-Za-z0-9]/.test(val))s++;
+            const levels=[{w:'0%',c:'transparent',t:''},{w:'20%',c:'#ff4444',t:'Very Weak'},{w:'40%',c:'#ff8c00',t:'Weak'},{w:'60%',c:'#ffd600',t:'Fair'},{w:'80%',c:'#1DB954',t:'Strong'},{w:'100%',c:'#00e676',t:'Very Strong'}];
+            bar.style.width=levels[s].w;bar.style.background=levels[s].c;lbl.innerText=levels[s].t;lbl.style.color=levels[s].c;
         }
 
         async function createProfile() {
-            const name      = document.getElementById('su-name').value.trim();
-            const userid    = document.getElementById('su-userid').value.trim();
-            const pass      = document.getElementById('su-pass').value;
-            const passConf  = document.getElementById('su-pass-confirm').value;
-            const devPass   = document.getElementById('su-dev-pass').value;
-            const devConf   = document.getElementById('su-dev-pass-confirm').value;
-            const captchaIn = document.getElementById('signup-captcha-input').value.toUpperCase().replace(/\s/g,'');
+            const name=document.getElementById('su-name').value.trim();
+            const userid=document.getElementById('su-userid').value.trim();
+            const pass=document.getElementById('su-pass').value;
+            const passConf=document.getElementById('su-pass-confirm').value;
+            const devPass=document.getElementById('su-dev-pass').value;
+            const devConf=document.getElementById('su-dev-pass-confirm').value;
+            const captchaIn=document.getElementById('signup-captcha-input').value.toUpperCase().replace(/\s/g,'');
             ['err-pass','err-dev','err-captcha'].forEach(id=>document.getElementById(id).style.display='none');
             if(!name||!userid||!pass||!devPass){alert('Please fill in all fields.');return;}
             if(pass!==passConf){document.getElementById('err-pass').style.display='block';return;}
             if(devPass!==devConf){document.getElementById('err-dev').style.display='block';return;}
             if(captchaIn!==signupCaptchaText){document.getElementById('err-captcha').style.display='block';generateSignupCaptcha();return;}
-            document.getElementById('create-btn').disabled = true;
-            document.getElementById('loading-msg').style.display = 'block';
+            document.getElementById('create-btn').disabled=true;
+            document.getElementById('loading-msg').style.display='block';
             try {
-                const appPassHash = await VCrypto.hashPassword(pass);
-                const devPassHash = await VCrypto.hashPassword(devPass);
-                const profile = { name, userid };
-                localStorage.setItem('vibipass_profile', JSON.stringify(profile));
-                localStorage.setItem('sentinel_app_pass', appPassHash);
-                localStorage.setItem('sentinel_dev_pass', devPassHash);
-                sessionStorage.setItem('vp_session_key', pass);
-                if(!localStorage.getItem('sentinel_img')) {
-                    localStorage.setItem('sentinel_img', 'green');
-                    localStorage.setItem('sentinel_color', '#1DB954');
-                }
-                window.location.href = 'auth.html';
+                const appPassHash=await VCrypto.hashPassword(pass);
+                const devPassHash=await VCrypto.hashPassword(devPass);
+                const profile={name,userid};
+                localStorage.setItem('vibipass_profile',JSON.stringify(profile));
+                localStorage.setItem('sentinel_app_pass',appPassHash);
+                localStorage.setItem('sentinel_dev_pass',devPassHash);
+                sessionStorage.setItem('vp_session_key',pass);
+                if(!localStorage.getItem('sentinel_img')){localStorage.setItem('sentinel_img','green');localStorage.setItem('sentinel_color','#1DB954');}
+                window.location.href='auth.html';
             } catch(e) {
                 alert('Error creating profile. Please try again.');
-                document.getElementById('create-btn').disabled = false;
-                document.getElementById('loading-msg').style.display = 'none';
+                document.getElementById('create-btn').disabled=false;
+                document.getElementById('loading-msg').style.display='none';
             }
         }
 
-        function waitForStorage() {
-            try {
-                if(localStorage.getItem('vibipass_profile')) {
-                    window.location.href = 'auth.html';
-                    return;
-                }
-                generateSignupCaptcha();
-            } catch(e) {
-                setTimeout(waitForStorage, 100);
-            }
-        }
-
-        window.addEventListener('DOMContentLoaded', () => setTimeout(waitForStorage, 1500));
+        window.onload = generateSignupCaptcha;
     </script>
 </body>
 </html>
