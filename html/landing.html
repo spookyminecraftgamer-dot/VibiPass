@@ -68,17 +68,27 @@
         </div>
         <h1>VibiPass</h1>
         <p class="tagline">Your personal secure vault</p>
-        <button class="cta-btn" onclick="window.location.href='signup.html'">
+        <button class="cta-btn" id="cta-btn" style="display:none" onclick="window.location.href='signup.html'">
             Start storing your precious sensitive data in the vault
         </button>
         <p class="footer-note">One profile. Total privacy. Always yours.</p>
     </div>
-
     <script>
-        // If profile already exists, skip to auth
-        if(localStorage.getItem('vibipass_profile')) {
-            window.location.href = 'auth.html';
+        function checkProfile() {
+            try {
+                if(localStorage.getItem('vibipass_profile')) {
+                    window.location.href = 'auth.html';
+                } else {
+                    // No profile — show the button
+                    document.getElementById('cta-btn').style.display = 'inline-block';
+                }
+            } catch(e) {
+                // Shim not ready yet, retry
+                setTimeout(checkProfile, 100);
+            }
         }
+
+        window.addEventListener('DOMContentLoaded', () => setTimeout(checkProfile, 1500));
     </script>
 </body>
 </html>
