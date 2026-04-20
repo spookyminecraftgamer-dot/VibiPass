@@ -1,6 +1,6 @@
 """
 VibiPass - PyWebView Desktop App
-Injects localStorage shim directly into HTML before serving.
+Pre-loads storage data into HTML so it's available before any script runs.
 """
 
 import webview
@@ -11,7 +11,6 @@ import threading
 import socketserver
 import socket
 from http.server import SimpleHTTPRequestHandler
-from io import BytesIO
 
 
 def get_base_dir() -> str:
@@ -42,7 +41,11 @@ def find_free_port() -> int:
         return s.getsockname()[1]
 
 
-class StorageBridge:
+# Global storage instance
+_storage = None
+
+
+class StorageBackend:
     def __init__(self):
         self._lock = threading.Lock()
         self._path = get_storage_path()
@@ -61,92 +64,134 @@ class StorageBridge:
         with open(self._path, "w", encoding="utf-8") as f:
             json.dump(self._data, f, ensure_ascii=False, indent=2)
 
-    def getItem(self, key: str):
+    def get(self, key):
         with self._lock:
-            val = self._data.get(key)
-            print(f"[VibiPass] getItem({key}) = {str(val)[:50] if val else None}")
-            return val
+            return self._data.get(key)
 
-    def setItem(self, key: str, value: str):
+    def set(self, key, value):
         with self._lock:
             self._data[key] = value
             self._save()
-            print(f"[VibiPass] setItem({key}) saved ✅")
-        return True
+            print(f"[VibiPass] set({key}) ✅")
 
-    def removeItem(self, key: str):
+    def remove(self, key):
         with self._lock:
             self._data.pop(key, None)
             self._save()
-        return True
 
     def clear(self):
         with self._lock:
             self._data.clear()
             self._save()
+
+    def all(self):
+        with self._lock:
+            return dict(self._data)
+
+
+class StorageBridge:
+    """Exposed to JS as window.pywebview.api"""
+
+    def getItem(self, key: str):
+        val = _storage.get(key)
+        print(f"[VibiPass] getItem({key}) = {str(val)[:40] if val else None}")
+        return val
+
+    def setItem(self, key: str, value: str):
+        _storage.set(key, value)
+        return True
+
+    def removeItem(self, key: str):
+        _storage.remove(key)
+        return True
+
+    def clear(self):
+        _storage.clear()
         return True
 
     def getAllKeys(self):
-        with self._lock:
-            keys = list(self._data.keys())
-            print(f"[VibiPass] getAllKeys() = {keys}")
-            return keys
+        keys = list(_storage.all().keys())
+        print(f"[VibiPass] getAllKeys() = {keys}")
+        return keys
 
 
-# This shim is injected directly into the HTML before any page script runs
-SHIM_SCRIPT = """<script>
-(function () {
-  // Poll until pywebview API is ready, then install shim
-  function installShim() {
-    var api = window.pywebview && window.pywebview.api;
-    if (!api) { setTimeout(installShim, 50); return; }
-    if (window.__vibiStorageReady) return;
-    window.__vibiStorageReady = true;
+def make_shim(data: dict) -> str:
+    """Generate a shim script with data pre-loaded — no async API calls needed."""
+    data_json = json.dumps(data)
+    return f"""<script>
+(function() {{
+  // Data pre-loaded from disk — available instantly, no async needed
+  var _preloaded = {data_json};
+  var _cache = Object.assign({{}}, _preloaded);
 
-    var _cache = {};
-    try {
-      var keys = api.getAllKeys();
-      if (Array.isArray(keys)) {
-        keys.forEach(function(k) { _cache[k] = api.getItem(k); });
-      }
-    } catch(e) {}
+  function persist(key, value) {{
+    // Also write back via pywebview API when available
+    function tryWrite() {{
+      if (window.pywebview && window.pywebview.api) {{
+        try {{ window.pywebview.api.setItem(key, value); }} catch(e) {{}}
+      }} else {{
+        setTimeout(tryWrite, 50);
+      }}
+    }}
+    tryWrite();
+  }}
 
-    var store = {
-      getItem: function(key) {
-        return Object.prototype.hasOwnProperty.call(_cache, key) ? _cache[key] : null;
-      },
-      setItem: function(key, value) {
-        _cache[key] = String(value);
-        try { api.setItem(key, String(value)); } catch(e) {}
-      },
-      removeItem: function(key) {
-        delete _cache[key];
-        try { api.removeItem(key); } catch(e) {}
-      },
-      clear: function() {
-        Object.keys(_cache).forEach(function(k) { delete _cache[k]; });
-        try { api.clear(); } catch(e) {}
-      },
-      key: function(index) { return Object.keys(_cache)[index] || null; },
-      get length() { return Object.keys(_cache).length; }
-    };
+  function persistRemove(key) {{
+    function tryRemove() {{
+      if (window.pywebview && window.pywebview.api) {{
+        try {{ window.pywebview.api.removeItem(key); }} catch(e) {{}}
+      }} else {{
+        setTimeout(tryRemove, 50);
+      }}
+    }}
+    tryRemove();
+  }}
 
-    try {
-      Object.defineProperty(window, 'localStorage', {
-        get: function() { return store; },
-        configurable: true
-      });
-    } catch(e) { window.localStorage = store; }
+  function persistClear() {{
+    function tryClear() {{
+      if (window.pywebview && window.pywebview.api) {{
+        try {{ window.pywebview.api.clear(); }} catch(e) {{}}
+      }} else {{
+        setTimeout(tryClear, 50);
+      }}
+    }}
+    tryClear();
+  }}
 
-    console.log('[VibiPass] localStorage shim ready ✅', Object.keys(_cache));
-  }
-  installShim();
-})();
+  var store = {{
+    getItem: function(key) {{
+      return Object.prototype.hasOwnProperty.call(_cache, key) ? _cache[key] : null;
+    }},
+    setItem: function(key, value) {{
+      _cache[key] = String(value);
+      persist(key, String(value));
+    }},
+    removeItem: function(key) {{
+      delete _cache[key];
+      persistRemove(key);
+    }},
+    clear: function() {{
+      Object.keys(_cache).forEach(function(k) {{ delete _cache[k]; }});
+      persistClear();
+    }},
+    key: function(index) {{ return Object.keys(_cache)[index] || null; }},
+    get length() {{ return Object.keys(_cache).length; }}
+  }};
+
+  try {{
+    Object.defineProperty(window, 'localStorage', {{
+      get: function() {{ return store; }},
+      configurable: true
+    }});
+  }} catch(e) {{ window.localStorage = store; }}
+
+  console.log('[VibiPass] localStorage ready with keys:', Object.keys(_cache));
+}})();
 </script>"""
 
 
 def make_handler(base_dir):
-    class ShimInjectingHandler(SimpleHTTPRequestHandler):
+    class DataInjectingHandler(SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, directory=base_dir, **kwargs)
 
@@ -154,39 +199,37 @@ def make_handler(base_dir):
         def log_error(self, format, *args): pass
 
         def do_GET(self):
-            # Only inject into HTML files
-            if self.path.endswith('.html') or '?' not in self.path and self.path.split('.')[-1] in ('html',):
+            clean_path = self.path.split('?')[0].lstrip('/')
+            file_path = os.path.join(base_dir, clean_path)
+
+            if clean_path.endswith('.html') and os.path.isfile(file_path):
                 try:
-                    # Build file path
-                    clean_path = self.path.split('?')[0].lstrip('/')
-                    file_path = os.path.join(base_dir, clean_path)
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
 
-                    if os.path.isfile(file_path):
-                        with open(file_path, 'r', encoding='utf-8') as f:
-                            content = f.read()
+                    # Inject shim with current data pre-loaded
+                    shim = make_shim(_storage.all())
+                    if '<head>' in content:
+                        content = content.replace('<head>', '<head>' + shim, 1)
+                    elif '<HEAD>' in content:
+                        content = content.replace('<HEAD>', '<HEAD>' + shim, 1)
+                    else:
+                        content = shim + content
 
-                        # Inject shim right after <head> tag
-                        if '<head>' in content:
-                            content = content.replace('<head>', '<head>' + SHIM_SCRIPT, 1)
-                        elif '<HEAD>' in content:
-                            content = content.replace('<HEAD>', '<HEAD>' + SHIM_SCRIPT, 1)
-                        else:
-                            content = SHIM_SCRIPT + content
-
-                        encoded = content.encode('utf-8')
-                        self.send_response(200)
-                        self.send_header('Content-Type', 'text/html; charset=utf-8')
-                        self.send_header('Content-Length', str(len(encoded)))
-                        self.end_headers()
-                        self.wfile.write(encoded)
-                        return
+                    encoded = content.encode('utf-8')
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'text/html; charset=utf-8')
+                    self.send_header('Content-Length', str(len(encoded)))
+                    self.send_header('Cache-Control', 'no-cache, no-store')
+                    self.end_headers()
+                    self.wfile.write(encoded)
+                    return
                 except Exception as e:
-                    print(f"[VibiPass] Shim inject error: {e}")
+                    print(f"[VibiPass] Handler error: {e}")
 
-            # Fall back to normal file serving
             super().do_GET()
 
-    return ShimInjectingHandler
+    return DataInjectingHandler
 
 
 def start_server(base_dir: str, port: int):
@@ -200,22 +243,22 @@ _window = None
 
 
 def main():
-    global _window
+    global _storage, _window
 
-    bridge = StorageBridge()
+    _storage = StorageBackend()
     base_dir = get_base_dir()
 
     port = find_free_port()
     start_server(base_dir, port)
 
-    start_page = "auth.html" if bridge.getItem("vibipass_profile") else "landing.html"
+    start_page = "auth.html" if _storage.get("vibipass_profile") else "landing.html"
     url = f"http://127.0.0.1:{port}/html/{start_page}"
     print(f"[VibiPass] Starting on: {url}")
 
     _window = webview.create_window(
         title="VibiPass",
         url=url,
-        js_api=bridge,
+        js_api=StorageBridge(),
         width=1024,
         height=700,
         min_size=(800, 560),
