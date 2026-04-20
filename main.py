@@ -11,6 +11,7 @@ import threading
 import http.server
 import socketserver
 import socket
+import time
 
 
 def get_base_dir() -> str:
@@ -159,15 +160,19 @@ _window = None
 def on_loaded():
     global _window
     if _window:
-        # Inject shim first
+        # Wait for pywebview API to be available in the page
+        time.sleep(0.3)
+        # Inject shim
         _window.evaluate_js(LOCALSTORAGE_SHIM)
-        # Then trigger waitForStorage if it exists on the page
+        # Then trigger page init functions after shim is ready
         _window.evaluate_js("""
             setTimeout(function() {
                 if (typeof waitForStorage === 'function') {
                     waitForStorage();
+                } else if (typeof initPage === 'function') {
+                    initPage();
                 }
-            }, 100);
+            }, 150);
         """)
 
 
