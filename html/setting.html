@@ -123,7 +123,7 @@
                 <img class="control-icon" src="../assets/theme/Red/delete.png" onerror="this.style.display='none'" style="filter:invert(35%) sepia(90%) saturate(600%) hue-rotate(330deg) brightness(110%) contrast(95%);">
                 <div class="control-text">
                     <h4>Nuke Vault</h4>
-                    <p>Permanently erase <strong>all</strong> credentials, profile, theme, and passwords. Irreversible — returns to landing page.</p>
+                    Permanently erase <strong>all</strong> credentials, profile, theme, and passwords. Irreversible â€” returns to landing page.
                 </div>
             </div>
             <button class="btn-danger" onclick="openNukeModal()">Nuke Vault</button>
@@ -316,7 +316,10 @@
             }
         }
 
-        window.onload = () => { applyTheme(); buildThemeGrid(); };
+        window.onload = () => { 
+    // Small delay to ensure pre-loaded localStorage is ready
+    setTimeout(() => { applyTheme(); buildThemeGrid(); }, 100);
+};
     </script>
 </body>
 </html>
