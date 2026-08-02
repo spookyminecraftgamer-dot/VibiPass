@@ -6,6 +6,6 @@ A privacy-first password and secure information manager designed around local en
 
 <p align="center">
   <a href="https://skillicons.dev">
-    <img src="https://skillicons.dev/icons?i=html,js,css,python,bash,github" />
+    <img src="https://skillicons.dev/icons?i=html,js,css,python,bash,innosetup,batchfile,github" />
   </a>
 </p>
